@@ -1,0 +1,10 @@
+{
+  "name": "9king-claude",
+  "version": "0.1.0",
+  "private": true,
+  "description": "9 Kings fan clone prototype (HTML5)",
+  "scripts": {
+    "test": "node tools/rules-test.js && node tools/fuzz.js 40",
+    "bot": "node tools/bot.js nothing king 6"
+  }
+}

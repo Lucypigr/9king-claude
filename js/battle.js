@@ -305,7 +305,7 @@
     if (this.done) return;
     this.t += dt;
     if (this.aimT > 0) { this.aimT -= dt; if (this.aimT <= 0) this.aim = null; }
-    if (this.t > 110 && !this.overtime) { this.overtime = true; }
+    if (this.t > 75 && !this.overtime) { this.overtime = true; }
     // 分離
     const cell = 18, hash = new Map();
     for (const o of this.u) if (o.alive && !o.immobile) { const key = (Math.floor(o.x / cell)) * 1000 + Math.floor(o.y / cell); let a = hash.get(key); if (!a) hash.set(key, a = []); a.push(o); }
