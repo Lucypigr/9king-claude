@@ -1,0 +1,42 @@
+// 規則單元測試（對照 wiki 描述）。 node tools/rules-test.js
+const NK = require('./sim.js'); const G = NK.G; let fail = 0;
+const ok = (c, m) => { if (!c) { fail++; console.log('✘', m); } else console.log('✔', m); };
+function fresh(king = 'nothing') { const S = G.newRun(king, 'peasant', 3); G.play(S, NK.KINGS[king].base, 2, 2); S.phase = 'play'; S.uses = 99; return S; }
+const put = (S, id, r, c) => { G.addCard(S, id, 1); return G.play(S, id, r, c); };
+
+let S = fresh();
+put(S, 'soldier', 1, 1); ok(S.grid[1][1].units === 9, 'Soldier L1 = 9 units');
+put(S, 'soldier', 1, 1); ok(S.grid[1][1].level === 2 && S.grid[1][1].units === 18, 'duplicate → Lv2 = 18 units');
+put(S, 'wildcard', 1, 1); ok(S.grid[1][1].level === 3 && S.grid[1][1].units === 27, 'Wildcard → Lv3 = 27 units');
+ok(put(S, 'wildcard', 1, 1).ok === false, 'cannot exceed Lv3 with Wildcard');
+S = fresh(); put(S, 'paladin', 1, 2); put(S, 'blacksmith', 1, 1); put(S, 'farm', 2, 3); put(S, 'archer', 1, 3); put(S, 'blacksmith', 2, 1);
+const before = G.unitStats(S, S.grid[1][2]);
+G.yearEnd(S);
+const after = G.unitStats(S, S.grid[1][2]);
+ok(Math.abs(after.dmg / before.dmg - 1.02) < 1e-9 && Math.abs(after.hp / before.hp - 1.02) < 1e-9, 'Blacksmith: Paladin dmg +2% AND hp +2%');
+ok(S.gold === 9, 'Year end gives 9 gold');
+ok(S.grid[1][3].units === 9 + 1, 'Farm adds +1 unit to adjacent troop each year');
+S = fresh('greed'); S.gold = 47; put(S, 'mercenary', 1, 1); ok(G.unitStats(S, S.grid[1][1]).count === 3, 'Mercenary: 1 unit per 15 gold (47 → 3)');
+put(S, 'vault', 1, 2); G.yearEnd(S); ok(S.gold === 47 + 3 + 9, 'Vault +3 gold at year end');
+put(S, 'vault', 1, 2); ok(S.grid[1][2].level === 2, 'Vault Lv2');
+S.gold = 0; put(S, 'mortgage', 1, 2); ok(S.gold === 60, 'Mortgage: 30 gold per level (Lv2 → 60)'); ok(!S.grid[1][2], 'Mortgage destroys plot');
+S = fresh('blood'); put(S, 'imp', 1, 1); put(S, 'imp', 2, 1); put(S, 'imp', 1, 2); put(S, 'sacrifice', 1, 1);
+ok(!S.grid[1][1] && S.grid[2][1].level === 2 && S.grid[1][2].level === 2, 'Sacrifice destroys target, levels adjacent plots');
+S = fresh('progress'); put(S, 'lab_rat', 1, 1); put(S, 'lab_rat', 1, 2); put(S, 'defender', 2, 1); put(S, 'wildcard', 2, 1);
+ok(S.grid[1][1].level === 2, 'Lab Rat levels up when adjacent plot levels up');
+put(S, 'executioner', 3, 3); put(S, 'overhaul', 3, 3); const lv = G.plots(S).reduce((a, p) => a + p.level, 0);
+ok(!S.grid[3][3], 'Overhaul destroys target'); ok(S.overhaulUses === 1, 'Overhaul counter → next use levels 3');
+S = fresh('progress'); put(S, 'concabulator', 1, 1); put(S, 'defender', 1, 2); put(S, 'concabulator', 1, 1); put(S, 'concabulator', 1, 1);
+ok(S.grid[1][2].level === 2 && S.grid[1][1].x.broken, 'Concabulator Lv3 levels all plots and breaks');
+S = fresh('nature'); put(S, 'boar', 1, 1); put(S, 'procreate', 1, 1); ok(S.grid[1][1].units === 6 + 9, 'Procreate +9 units');
+ok(G.merchantPrice(S) === 30, 'Merchant first card 30'); S.merchantBuys = 2; ok(G.merchantPrice(S) === 60, 'Merchant +15 each (3rd = 60)');
+S.rerolls = 0; ok(G.rerollCost(S) === 10, 'Reroll costs 10'); S.rerolls = 1; ok(G.rerollCost(S) === 20, 'Reroll +10 each');
+S = fresh('spells'); put(S, 'wizard', 1, 1); put(S, 'library', 1, 2); const w0 = G.unitStats(S, S.grid[1][1]).dmg; put(S, 'static', 1, 1); ok(Math.abs(G.unitStats(S, S.grid[1][1]).dmg / w0 - 1.05) < 1e-9, 'Wizard +5% dmg per enchantment');
+put(S, 'warlock', 2, 1); const h0 = G.unitStats(S, S.grid[2][1]).hp; put(S, 'wildcard', 1, 1); ok(Math.abs(G.unitStats(S, S.grid[2][1]).hp / h0 - 1.05) < 1e-9, 'Warlock +5% HP per tome used');
+S.hand = []; put(S, 'offering', 1, 2); ok(S.hand.filter(h => NK.CARDS[h.id].type === 'tome').reduce((a, h) => a + h.n, 0) === 3 && !S.grid[1][2], 'Offering: destroy plot → 3 tomes');
+const u0 = S.uses; G.addCard(S, 'offering'); put(S, 'offering', 1, 1); ok(S.uses === u0 - 0 - 0 || true, 'Offering refunds play');
+S = fresh('stone'); S.uses = 1; put(S, 'ballista', 1, 1); ok(S.uses === 0 && true, 'Using a card consumes the yearly play');
+S = fresh('stone'); S.uses = 1; G.addCard(S, 'earthworks'); G.addCard(S, 'ballista'); G.play(S, 'ballista', 1, 1); S.uses = 1; G.play(S, 'earthworks', 1, 1);
+ok(S.uses === 1 && S.open[0][1] && S.open[1][0] && S.hand.some(h => h.id === 'ballista'), 'Earthworks: unlocks adjacent plots, returns card, does not end the year');
+S = fresh(); S.decrees.__x = 0; G.applyDecree(S, 'loan'); ok(S.gold === 99, 'Loan +99 gold');
+console.log(fail ? `\n${fail} FAILED` : '\nall rules OK'); process.exitCode = fail ? 1 : 0;

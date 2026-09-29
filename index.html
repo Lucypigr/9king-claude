@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>九王 9 Kings – 王國建造 Roguelike 卡牌</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <!-- 標題 -->
+  <section id="title" class="screen">
+    <div class="title-art"></div>
+    <h1><span class="crown">👑</span><b>九王</b><small>9 KINGS</small></h1>
+    <p class="subtitle" data-i="subtitle"></p>
+    <div class="menu">
+      <button id="btnContinue" class="btn big" hidden></button>
+      <button id="btnNew" class="btn big primary"></button>
+      <button id="btnHow" class="btn"></button>
+      <button id="btnLang" class="btn"></button>
+    </div>
+    <p class="fine" data-i="fine"></p>
+  </section>
+
+  <!-- 選王 -->
+  <section id="select" class="screen" hidden>
+    <h2 data-i="chooseKing"></h2>
+    <div id="kingRow"></div>
+    <div id="kingInfo"></div>
+    <div class="diffRow"><span data-i="difficulty"></span><div id="diffBtns"></div></div>
+    <div class="menu"><button id="btnBack" class="btn"></button><button id="btnStart" class="btn big primary"></button></div>
+  </section>
+
+  <!-- 遊戲 -->
+  <section id="game" class="screen" hidden>
+    <header id="topbar"></header>
+    <div id="field">
+      <canvas id="bg" width="1280" height="620"></canvas>
+      <div id="grid"></div>
+      <canvas id="fx" width="1280" height="620"></canvas>
+      <div id="preview"></div>
+      <div id="banner"></div>
+    </div>
+    <footer id="bottom">
+      <div id="hand"></div>
+      <div id="actions"></div>
+    </footer>
+  </section>
+
+  <div id="overlay" hidden></div>
+  <div id="toast"></div>
+  <div id="tip" hidden></div>
+</div>
+<script src="js/data/cards.js"></script>
+<script src="js/data/kings.js"></script>
+<script src="js/state.js"></script>
+<script src="js/enemy.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/render.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
