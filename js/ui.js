@@ -8,7 +8,7 @@
   const KTYPE_ICON = { base: '🏰', troop: '⚔', building: '🏠', tower: '🗼', ench: '✨', tome: '📖' };
 
   let S = null, B = null, sel = null, speed = 1, expand = null, prophecyMarks = null, bgKey = '', bgCanvas = null, raf = 0, lastT = 0, acc = 0, battleEnding = false;
-  let pickKing = 'nothing', pickDiff = 'peasant';
+  let pickKing = 'nothing', pickDiff = 'peasant', use3d = false, last3 = 0;
   const SAVE = 'nineKings.save.v1';
 
   function h(tag, cls, html, parent) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e; }
@@ -33,8 +33,9 @@
     o = o || {}; const cd = C[id];
     const e = h('div', `card t-${cd.type} ${o.size || ''} ${cd.king === 'rainbow' ? 'rainbow' : ''}`);
     e.style.setProperty('--kc', kcol(cd.king));
+    const th = NK.V3.ok ? NK.V3.thumb(id) : null;
     e.innerHTML = `<div class="c-head"><span>${cname(id)}</span><span class="c-type">${NK.typeName(cd.type)}</span></div>
-      <div class="c-art"><span class="c-emoji">${cd.ic}</span></div><div class="c-desc">${cdesc(id)}</div>
+      <div class="c-art ${th ? 'has3d' : ''}">${th ? `<img class="c-img" src="${th}" alt="">` : `<span class="c-emoji">${cd.ic}</span>`}</div><div class="c-desc">${cdesc(id)}</div>
       <div class="c-foot"><span>${K[cd.king] ? nm(K[cd.king]).replace(/^King of |之王$/g, '') : ''}</span><span>${cd.guess ? '≈' : ''}</span></div>`;
     if (o.count > 1) h('span', 'cnt', '×' + o.count, e);
     attachTip(e, () => cardTip(id));
@@ -79,7 +80,7 @@
     const lay = NK.layout(S, cands);
     grid.style.setProperty('--cs', lay.cs);
     const key = lay.right + ':' + S.king;
-    if (key !== bgKey) { bgKey = key; bgCanvas = R.makeBackground(lay, K[S.king].dark); const c = $('#bg'), x = c.getContext('2d'); x.clearRect(0, 0, 1280, 620); x.drawImage(bgCanvas, 0, 0); }
+    if (!use3d && key !== bgKey) { bgKey = key; bgCanvas = R.makeBackground(lay, K[S.king].dark); const c = $('#bg'), x = c.getContext('2d'); x.clearRect(0, 0, 1280, 620); x.drawImage(bgCanvas, 0, 0); }
     const valid = new Set(); const selTargets = sel ? G.validTargets(S, sel) : null;
     if (selTargets) selTargets.forEach(([r, c]) => valid.add(r + ',' + c));
     if (S.phase === 'setup') for (let r = 0; r < NK.CONST.GRID; r++) for (let c = 0; c < NK.CONST.GRID; c++) if (G.isOpen(S, r, c) && !S.grid[r][c]) valid.add(r + ',' + c);
@@ -90,7 +91,8 @@
       const pos = lay.pos(r, c), size = lay.cs - 10;
       const p = S.grid[r][c];
       const e = h('div', 'plot', null, grid);
-      e.style.cssText = `left:${pos.x - size / 2}px;top:${pos.y - size / 2}px;width:${size}px;height:${size}px;`;
+      if (use3d) { const q = NK.V3.plotRect(lay, r, c); e.style.cssText = `left:${q.x}px;top:${q.y}px;width:${q.w}px;height:${q.h}px;`; e.classList.add('p3'); }
+      else e.style.cssText = `left:${pos.x - size / 2}px;top:${pos.y - size / 2}px;width:${size}px;height:${size}px;`;
       e.dataset.r = r; e.dataset.c = c;
       if (isC) { e.classList.add('candidate'); e.onclick = () => onExpand(r, c); continue; }
       if (S.razed[r][c]) e.classList.add('locked-razed');
@@ -101,11 +103,12 @@
       if (cd.isTroopBase) e.style.setProperty('--tc', '#e3b23a');
       const en = Object.keys(p.ench).map(k => `<span>${C[k].ic}${p.ench[k] > 1 ? p.ench[k] : ''}</span>`).join('');
       const cnt = (cd.type === 'troop' || cd.isTroopBase) ? `<div class="p-cnt" data-cnt="1">${cd.gold15 ? G.unitStats(S, p).count : p.units}</div>` : '';
-      e.innerHTML = `<div class="p-name">${cname(p.card)}</div><div class="p-art">${cd.ic}</div><div class="p-ench">${en}</div><div class="p-lv">${'★'.repeat(Math.min(p.level, 6))}${p.level > 6 ? '+' + (p.level - 6) : ''}</div>${cnt}`;
+      e.innerHTML = `<div class="p-name">${cname(p.card)}</div>${use3d ? '' : `<div class="p-art">${cd.ic}</div>`}<div class="p-ench">${en}</div>${use3d ? '' : `<div class="p-lv">${'★'.repeat(Math.min(p.level, 6))}${p.level > 6 ? '+' + (p.level - 6) : ''}</div>`}${cnt}`;
       if (valid.has(r + ',' + c)) e.classList.add('valid');
       e.onclick = () => onPlot(r, c);
       attachTip(e, () => plotTip(p));
     }
+    if (use3d) NK.V3.setPlots(S, lay, { valid, cands, prophecy: pm });
   }
 
   /* ───── 手牌 / 操作列 ───── */
@@ -306,18 +309,18 @@
     if (!S.cur) G.planBattle(S);
     S.phase = 'battle'; sel = null; banner(''); prophecyMarks = null; tipHide();
     B = new NK.Battle(S, S.cur.wave); speed = 1; acc = 0; lastT = performance.now(); battleEnding = false;
+    if (use3d) NK.V3.setBattle(B);
     renderAll(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
   }
   function loop(t) {
     const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t; acc += dt * speed;
     let n = 0; while (acc >= 0.05 && n++ < 40 && !B.done) { B.step(0.05); acc -= 0.05; }
     if (B.t > 180 && !B.done) { B.baseHit = true; }
-    const ctx = $('#fx').getContext('2d'); ctx.clearRect(0, 0, 1280, 620);
-    R.drawBattle(ctx, B, { aim: B.aim });
+    const ctx = $('#fx').getContext('2d'); if (!use3d) { ctx.clearRect(0, 0, 1280, 620); R.drawBattle(ctx, B, { aim: B.aim }); }
     updateBattlePlots();
     if (B.done && !battleEnding) { battleEnding = true; renderPreview(); setTimeout(endBattle, 900); }
     if (!B.done || battleEnding) raf = requestAnimationFrame(loop);
-    if (B.done) { ctx.clearRect(0, 0, 1280, 620); R.drawBattle(ctx, B, {}); }
+    if (B.done && !use3d) { ctx.clearRect(0, 0, 1280, 620); R.drawBattle(ctx, B, {}); }
     if ((B.tick = (B.tick || 0) + 1) % 15 === 0) renderPreview();
   }
   function updateBattlePlots() {
@@ -332,7 +335,7 @@
     modal((m) => {
       m.innerHTML = `<div class="bigres ${res.win ? 'win' : 'lose'}">${res.win ? '⚔ ' + tr('victory') : '💀 ' + tr('defeat')}</div>
         <div class="statline">${tr('kills')}: ${res.kills}　·　${Math.round(res.time)}s${res.gold ? '　·　+' + res.gold + '🪙' : ''}</div>`;
-      const f = h('div', 'foot', null, m); h('button', 'btn primary', 'OK', f).onclick = () => { closeModal(); B = null; const r = G.finishBattle(S, { win: res.win }); $('#fx').getContext('2d').clearRect(0, 0, 1280, 620); save(); afterState(); };
+      const f = h('div', 'foot', null, m); h('button', 'btn primary', 'OK', f).onclick = () => { closeModal(); B = null; if (use3d) NK.V3.setBattle(null); const r = G.finishBattle(S, { win: res.win }); $('#fx').getContext('2d').clearRect(0, 0, 1280, 620); save(); afterState(); };
     });
   }
   function gameEnd() {
@@ -353,7 +356,8 @@
     const f = $('#field');
     f.addEventListener('pointerdown', (ev) => {
       if (!B || B.done) return; const r = f.getBoundingClientRect(), s = r.width / 1280;
-      const x = (ev.clientX - r.left) / s, y = (ev.clientY - r.top) / s;
+      let x = (ev.clientX - r.left) / s, y = (ev.clientY - r.top) / s;
+      if (use3d) { const w = NK.V3.pick(ev.clientX, ev.clientY, r); if (!w) return; x = w.x; y = w.y; }
       if (x < B.lay.right + 30) return; B.aim = { x, y }; B.aimT = 3;
     });
   }
@@ -407,10 +411,12 @@
   UI.init = function () {
     try { const l = localStorage.getItem('nineKings.lang'); if (l) NK.lang = l; } catch (e) { /* */ }
     fit(); initFieldClick();
+    use3d = NK.V3.ok || NK.V3.init($('#gl')); NK.V3.ok = !!use3d; if (!use3d) $('#gl').style.display = 'none'; else $('#stage').classList.add('use3d');
+    if (use3d) { let lt = performance.now(); (function tick(t) { NK.V3.frame(Math.min(0.1, (t - lt) / 1000)); lt = t; requestAnimationFrame(tick); })(lt); }
     $('#btnNew').onclick = () => showScreen('select'); $('#btnHow').onclick = showHow; $('#btnLang').onclick = toggleLang;
     $('#btnContinue').onclick = continueRun; $('#btnBack').onclick = () => showScreen('title'); $('#btnStart').onclick = newRun;
     showScreen('title');
     UI.get = () => ({ S, B });
-    UI.debug = { renderAll, startBattle, afterState, setState: (s) => { S = s; bgKey = ''; showScreen('game'); } };
+    UI.debug = { use3d: () => use3d, renderAll, startBattle, afterState, setState: (s) => { S = s; bgKey = ''; showScreen('game'); } };
   };
 })(globalThis.NK = globalThis.NK || {});
